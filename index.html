@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>ChessTimer</title>
+<link rel="stylesheet" href="https://use.typekit.net/sra8jci.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --orange:       #FF6C02;
+    --orange-grad-top: #F57E15;
+    --orange-grad-bot: #DF3E03;
+    --cream:        #F9F2E4;
+    --cream-btn:    #FEF8EB;
+    --cream-dark:   #EDE6DA;
+    --grey-mid:     #A8A4A0;
+    --grey-dark:    #888480;
+    --zone-inactive-top: #C7C6C6;
+    --zone-inactive-bot: #6B6B6B;
+    --tile-top-a:   #4C4C4C;
+    --tile-top-b:   #777676;
+    --tile-bot-a:   #474747;
+    --tile-bot-b:   #2A2A2A;
+    --split-line:   #000000;
+    --dot-active:   #A12B00;
+    --dot-inactive: #838383;
+    --white:        #FFFFFF;
+    --black:        #000000;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: var(--black);
+    font-family: 'futura-pt', 'Futura', 'Century Gothic', sans-serif;
+  }
+
+  #app {
+    width: 100%; height: 100%;
+    position: relative;
+    overflow: visible;
+  }
+
+  /* ─── SCREENS ─── */
+  .screen {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.4s ease;
+  }
+  .screen.active { opacity: 1; pointer-events: all; }
+
+  /* ─── SPLASH ─── */
+  #splash { background: var(--cream); }
+
+  .splash-logo-wrap {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 24px;
+    margin-bottom: auto;
+    margin-top: auto;
+  }
+  .splash-icon { width: 102px; height: 112px; }
+  .splash-wordmark {
+    font-family: 'futura-pt', 'Futura', 'Century Gothic', sans-serif;
+    font-size: 38px; font-weight: 600;
+    letter-spacing: -0.04em;
+  }
+  .splash-wordmark span.w1 { color: var(--black); }
+  .splash-wordmark span.w2 { color: var(--orange); }
+  .splash-loading {
+    font-family: 'futura-pt', 'Futura', 'Century Gothic', sans-serif;
+    font-size: 18px; font-weight: 400;
+    color: var(--black);
+    margin-bottom: 60px;
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
+
+  /* ─── GAME SCREEN ─── */
+  #game {
+    background: var(--cream);
+    padding: 0;
+    justify-content: stretch;
+    flex-direction: column;
+  }
+
+  /* ─── PLAYER ZONES ─── */
+  .player-zone {
+    flex: 1;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: space-between;
+    position: relative;
+    padding: 14px 16px;
+    cursor: pointer;
+    border-radius: 48px;
+    margin: 10px 12px 4px;
+    user-select: none;
+    -webkit-user-select: none;
+    overflow: hidden;
+  }
+  .player-zone.top {
+    transform: rotate(180deg);
+    margin-top: 10px; margin-bottom: 16px;
+  }
+  .player-zone.bottom {
+    margin-top: 16px; margin-bottom: 10px;
+  }
+
+  /* Zone background gradients — exact from Figma */
+  .player-zone.state-active,
+  .player-zone.state-idle-active,
+  .player-zone.state-gameover-won {
+    background: linear-gradient(180deg, var(--orange-grad-top) 0%, var(--orange-grad-bot) 100%);
+    box-shadow: 0px 5px 7.7px rgba(0,0,0,0.3);
+  }
+  .player-zone.state-inactive,
+  .player-zone.state-idle-inactive,
+  .player-zone.state-gameover-lost {
+    background: linear-gradient(180deg, var(--zone-inactive-top) 0%, var(--zone-inactive-bot) 100%);
+  }
+
+  /* ─── SPEAKER GRILL / KNURLING ─── */
+  .speaker-grill {
+    position: absolute;
+    left: 8.47%; right: 8.47%;
+    top: 54.6%; bottom: 8.91%;
+    border-radius: 29px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.08s ease;
+  }
+  .player-zone.state-active .speaker-grill,
+  .player-zone.state-idle-active .speaker-grill,
+  .player-zone.state-gameover-won .speaker-grill {
+    background: rgba(255, 108, 2, 0.4);
+    box-shadow: 0px 5px 7.7px 0px rgba(0, 0, 0, 0.3);
+  }
+  .player-zone.state-inactive .speaker-grill,
+  .player-zone.state-idle-inactive .speaker-grill,
+  .player-zone.state-gameover-lost .speaker-grill {
+    background: rgba(0,0,0,0.10);
+  }
+
+  /* Pressed state — only on active zone */
+  .player-zone.state-active:active .speaker-grill,
+  .player-zone.state-idle-active:active .speaker-grill {
+    background: rgba(180, 70, 0, 0.55);
+    box-shadow: 0px 2px 4px 0px rgba(0, 0, 0, 0.3);
+    transform: scale(0.97);
+  }
+
+  /* Knurling dots — 8 cols × 5 rows, 5px dots, 3px gap */
+  .dot-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 5px);
+    grid-template-rows: repeat(5, 5px);
+    gap: 3px;
+  }
+  .dot-grid span {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+  }
+  .player-zone.state-active .dot-grid span,
+  .player-zone.state-idle-active .dot-grid span,
+  .player-zone.state-gameover-won .dot-grid span {
+    background: var(--dot-active);
+  }
+  .player-zone.state-inactive .dot-grid span,
+  .player-zone.state-idle-inactive .dot-grid span,
+  .player-zone.state-gameover-lost .dot-grid span {
+    background: var(--dot-inactive);
+  }
+
+  /* ─── FLIP ANIMATION ─── */
+  @keyframes flipTop {
+    0%   { transform: rotateX(0deg); }
+    100% { transform: rotateX(-90deg); }
+  }
+  @keyframes flipBottom {
+    0%   { transform: rotateX(90deg); }
+    100% { transform: rotateX(0deg); }
+  }
+
+  .flip-tile { perspective: 600px; }
+
+  /* All 4 layers are absolute, half height, clipping their digit */
+  .flip-static-top,
+  .flip-flap-top {
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 50%;
+    background: linear-gradient(180deg, var(--tile-top-a) 0%, var(--tile-top-b) 100%);
+    border-radius: 25px 25px 0 0;
+    overflow: hidden;
+    display: flex; align-items: flex-end; justify-content: center;
+  }
+  .flip-static-bottom,
+  .flip-flap-bottom {
+    position: absolute;
+    bottom: 0; left: 0; right: 0; height: 50%;
+    background: linear-gradient(180deg, var(--tile-bot-a) 0%, var(--tile-bot-b) 100%);
+    border-radius: 0 0 25px 25px;
+    overflow: hidden;
+    display: flex; align-items: flex-start; justify-content: center;
+  }
+
+  /* Digits positioned so only the correct half is visible */
+  .flip-static-top .flip-digit,
+  .flip-flap-top .flip-digit {
+    transform: translateY(50%);
+    display: block;
+  }
+  .flip-static-bottom .flip-digit,
+  .flip-flap-bottom .flip-digit {
+    transform: translateY(-50%);
+    display: block;
+  }
+
+  /* Small tile border radius overrides */
+  .flip-tile.small .flip-static-top,
+  .flip-tile.small .flip-flap-top    { border-radius: 18px 18px 0 0; }
+  .flip-tile.small .flip-static-bottom,
+  .flip-tile.small .flip-flap-bottom { border-radius: 0 0 18px 18px; }
+
+  /* Z-ordering: static behind, flap in front */
+  .flip-static-top    { z-index: 1; }
+  .flip-static-bottom { z-index: 1; }
+  .flip-flap-top      { z-index: 2; transform-origin: bottom center; backface-visibility: hidden; }
+  .flip-flap-bottom   { z-index: 2; transform-origin: top center;    backface-visibility: hidden; }
+
+  .flip-flap-top.animating {
+    animation: flipTop 0.15s ease-in forwards;
+  }
+  .flip-flap-bottom.animating {
+    animation: flipBottom 0.15s ease-out 0.15s forwards;
+    transform: rotateX(90deg);
+  }
+  .flip-clock {
+    display: flex; align-items: center;
+    gap: 7px;
+    background: #000000;
+    border-radius: 33px;
+    padding: 10px 14px;
+    flex-shrink: 0;
+  }
+
+  /* Large tile: 120×131 from Figma, one tile per group (2 digits each) */
+  .flip-tile {
+    position: relative;
+    width: clamp(80px, 28vw, 120px);
+    height: clamp(76px, 30vw, 131px);
+    border-radius: 25px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .flip-digit {
+    font-family: 'futura-pt', 'Futura', 'Century Gothic', sans-serif;
+    font-weight: 400;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    color: var(--white);
+  }
+
+  /* Centre split line */
+  .flip-tile::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0;
+    top: calc(50% - 1.5px);
+    height: 3px;
+    background: var(--split-line);
+    z-index: 4;
+  }
+
+  /* Small tile for tenths digit */
+  .flip-tile.small {
+    width: clamp(44px, 17vw, 76px);
+    height: clamp(52px, 20vw, 91px);
+    border-radius: 18px;
+  }
+
+  /* Separator dots between digit groups — B3B3B3 pill from Figma */
+  .flip-sep-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #B3B3B3;
+    flex-shrink: 0;
+  }
+  .flip-sep-wrap {
+    display: flex; flex-direction: column;
+    gap: 8px; align-items: center; justify-content: center;
+    align-self: center;
+    flex-shrink: 0;
+  }
+
+  /* ─── CENTER BAR ─── */
+  .center-bar {
+    height: 75px;
+    display: flex; align-items: center;
+    padding: 10px 12px;
+    flex-shrink: 0;
+    overflow: visible;
+  }
+
+  /* Pause/Play pill button */
+  .btn-pause-play {
+    height: 55px;
+    min-width: 126px;
+    border-radius: 27.5px;
+    border: none;
+    background: var(--cream-btn);
+    box-shadow: 0px 4px 5px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px;
+    flex-shrink: 0;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: transform 0.1s;
+    position: relative;
+    z-index: 10;
+  }
+  .btn-pause-play:active { transform: scale(0.95); }
+
+  /* Logo text (shown when idle/paused) */
+  .btn-logo {
+    height: 55px;
+    min-width: 126px;
+    border-radius: 27.5px;
+    border: none;
+    background: transparent;
+    cursor: default;
+    display: flex; align-items: center; justify-content: flex-start;
+    padding: 0 4px;
+    flex-shrink: 0;
+    pointer-events: none;
+  }
+  .logo-text {
+    font-family: 'futura-pt', 'Futura', 'Century Gothic', sans-serif;
+    font-weight: 600;
+    font-size: 30px;
+    letter-spacing: -0.04em;
+    line-height: 1;
+  }
+  .logo-text .l1 { color: var(--black); }
+  .logo-text .l2 { color: var(--orange); }
+
+  /* Round icon buttons */
+  .btn-icon {
+    width: 55px; height: 55px;
+    border-radius: 50%;
+    border: none;
+    background: var(--cream-btn);
+    box-shadow: 0px 4px 5px rgba(0,0,0,0.2);
+    filter: drop-shadow(0px 4px 5px rgba(0, 0, 0, 0.2));
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    padding: 9px;
+    flex-shrink: 0;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: transform 0.1s;
+  }
+  .btn-icon:active { transform: scale(0.93); }
+  .btn-icon svg { width: 100%; height: 100%; }
+  #btn-reset { padding: 7px; }
+
+  .right-btns { display: flex; gap: 8px; margin-left: auto; padding-left: 32px; }
+
+  /* Pause/play icon colour */
+  .icon-orange { fill: var(--orange); }
+
+  /* ─── GAMEOVER OVERLAY ─── */
+  .gameover-label {
+    display: none;
+    position: absolute; inset: 0;
+    align-items: center; justify-content: center;
+    z-index: 10;
+    border-radius: 48px;
+  }
+  .gameover-label.visible { display: flex; }
+  .gameover-text {
+    font-family: 'futura-pt', 'Futura', 'Century Gothic', sans-serif;
+    font-weight: 500; font-size: 28px;
+    color: var(--white);
+    background: rgba(0,0,0,0.38);
+    padding: 12px 28px;
+    border-radius: 999px;
+    letter-spacing: -0.02em;
+  }
+
+  /* ─── TIME SELECTION DRAWER ─── */
+  #drawer-overlay {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.35);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 50;
+  }
+  #drawer-overlay.open { opacity: 1; pointer-events: all; }
+
+  #drawer {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    background: var(--cream);
+    border-radius: 28px 28px 0 0;
+    padding: 16px 24px 48px;
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+    z-index: 51;
+  }
+  #drawer.open { transform: translateY(0); }
+
+  .drawer-handle {
+    width: 40px; height: 5px;
+    background: #C4C4C4;
+    border-radius: 999px;
+    margin: 0 auto 22px;
+  }
+  .drawer-title {
+    font-family: 'futura-pt', 'Futura', 'Century Gothic', sans-serif;
+    font-weight: 600; font-size: 31px;
+    letter-spacing: -0.04em;
+    color: var(--black);
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  .time-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .time-btn {
+    height: 58px;
+    border-radius: 29px;
+    border: 2px solid var(--black);
+    background: transparent;
+    font-family: 'futura-pt', 'Futura', 'Century Gothic', sans-serif;
+    font-weight: 450; font-size: 24px;
+    line-height: 31px;
+    letter-spacing: -0.04em;
+    color: var(--black);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .time-btn:active { transform: scale(0.96); }
+  .time-btn.selected {
+    background: var(--orange);
+    border-color: var(--orange);
+    color: var(--black);
+  }
+
+  /* ─── RESET CONFIRM DIALOG ─── */
+  #confirm-overlay {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 100;
+  }
+  #confirm-overlay.open { opacity: 1; pointer-events: all; }
+  .confirm-box {
+    background: var(--cream);
+    border-radius: 24px;
+    padding: 32px 28px 24px;
+    width: min(320px, 85vw);
+    display: flex; flex-direction: column; align-items: center;
+    gap: 10px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .confirm-title {
+    font-family: 'futura-pt', 'Futura', 'Century Gothic', sans-serif;
+    font-weight: 500; font-size: 22px;
+    letter-spacing: -0.03em;
+    color: var(--black); text-align: center;
+    margin-bottom: 4px;
+  }
+  .confirm-sub {
+    font-family: 'futura-pt', 'Futura', 'Century Gothic', sans-serif;
+    font-size: 15px; color: var(--grey-dark);
+    text-align: center; margin-bottom: 8px;
+    font-weight: 400;
+  }
+  .confirm-btns { display: flex; gap: 12px; width: 100%; }
+  .confirm-btn {
+    flex: 1; padding: 14px;
+    border-radius: 999px; border: none;
+    font-family: 'futura-pt', 'Futura', 'Century Gothic', sans-serif;
+    font-weight: 500; font-size: 16px;
+    letter-spacing: -0.02em;
+    cursor: pointer; transition: transform 0.1s;
+  }
+  .confirm-btn:active { transform: scale(0.96); }
+  .confirm-btn.cancel  { background: var(--cream-dark); color: var(--black); }
+  .confirm-btn.confirm { background: var(--orange);     color: var(--white); }
+
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- SPLASH -->
+  <div id="splash" class="screen active">
+    <div class="splash-logo-wrap">
+      <svg class="splash-icon" width="102" height="112" viewBox="0 0 102 112" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M102 2.72023C102 4.21611 100.776 5.44023 99.28 5.44023H88.4V0.000226542H99.28C100.776 0.000226542 102 1.22434 102 2.72023ZM87.04 92.4802H2.72C1.22411 92.4802 0 93.7043 0 95.2002V108.8C0 110.296 1.22411 111.52 2.72 111.52H87.04C88.5359 111.52 89.76 110.296 89.76 108.8V95.2002C89.76 93.7043 88.5359 92.4802 87.04 92.4802ZM39.032 53.7202C38.352 53.1761 38.0802 52.4961 38.0802 51.6802V24.4802C38.0802 23.392 38.7602 22.4402 39.712 22.032C40.6638 21.6238 41.752 21.7602 42.5678 22.4402L74.5278 48.6882C76.1596 49.7764 78.3361 49.9123 80.1037 48.96C81.872 48.0082 83.0955 46.24 83.0955 44.2L83.0959 0H31.4159C17.9519 0 6.93594 11.0159 6.93594 24.48V87.04H78.1999L39.032 53.7202Z" fill="black"/>
+        <circle cx="4.98853" cy="4.98853" r="4.98853" transform="matrix(0.707107 -0.707107 -0.707107 -0.707107 50.77 58.1492)" fill="#FF6C02"/>
+        <path d="M93.9992 13.4223L93.0297 14.4816L54.8162 56.2223L53.7576 57.3789L44.4858 48.1071L45.6418 47.0479L87.3832 8.83509L88.4418 7.86489L93.9992 13.4223Z" fill="#FF6C02" stroke="#F9F2E4" stroke-width="3"/>
+        <path d="M48.4878 55.6404L18.8143 31.6534L21.8105 27.665L54.4803 47.6634L48.4878 55.6404Z" fill="#FF6C02"/>
+        <circle cx="4.98853" cy="4.98853" r="4.98853" transform="matrix(-0.799529 -0.600628 -0.600628 0.799529 57.8042 50.1603)" fill="#FF6C02"/>
+        <circle cx="2.69242" cy="2.69242" r="2.69242" transform="matrix(-0.799529 -0.600628 -0.600628 0.799529 54.5889 50.6169)" fill="black"/>
+      </svg>
+      <div class="splash-wordmark"><span class="w1">Chess</span><span class="w2">Timer</span></div>
+    </div>
+    <div class="splash-loading">Loading...</div>
+  </div>
+
+  <!-- GAME -->
+  <div id="game" class="screen">
+
+    <!-- TOP player zone -->
+    <div class="player-zone top state-idle-inactive" id="zone-top" onclick="handleZoneTap('top')">
+      <div class="speaker-grill">
+        <div class="dot-grid" id="dots-top"></div>
+      </div>
+      <div class="flip-clock" id="clock-top">
+        <!-- filled by JS -->
+      </div>
+      <div class="gameover-label" id="gameover-top">
+        <div class="gameover-text">Time's Up!</div>
+      </div>
+    </div>
+
+    <!-- CENTER BAR -->
+    <div class="center-bar">
+      <!-- Left: logo or pause/play -->
+      <div id="center-left">
+        <button class="btn-pill btn-logo" id="btn-logo">
+          <span class="logo-text"><span class="l1">Chess</span><span class="l2">Timer</span></span>
+        </button>
+        <button class="btn-pill btn-pause-play" id="btn-pause" onclick="handlePause()" style="display:none">
+          <!-- icon set by JS -->
+        </button>
+      </div>
+      <!-- Right: reset + time select -->
+      <div class="right-btns">
+        <button class="btn-pill btn-icon" id="btn-reset" onclick="handleReset()">
+          <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <g clip-path="url(#clip0_reset)">
+              <path d="M12.9285 11.7333C10.6289 13.7608 9.0966 16.5174 8.5899 19.5411C8.08331 22.5648 8.63317 25.6707 10.1464 28.3372C11.6597 31.0036 14.0447 33.0685 16.9005 34.1839C19.7561 35.2992 22.9093 35.3977 25.8291 34.4629C28.7488 33.5281 31.2579 31.6168 32.9347 29.0505C34.6116 26.484 35.3539 23.418 35.0373 20.3684C34.7206 17.319 33.3639 14.4716 31.1952 12.3043C30.8812 11.9906 30.4238 11.8677 29.9951 11.9826C29.5662 12.0975 29.2309 12.4328 29.116 12.8616C29.0012 13.2903 29.1241 13.7478 29.4378 14.0618C31.217 15.8417 32.3245 18.1836 32.5715 20.6881C32.8184 23.1927 32.1901 25.706 30.7926 27.7992C29.3951 29.8923 27.315 31.436 24.9072 32.1682C22.4994 32.9003 19.9122 32.7755 17.5862 31.8147C15.2602 30.8539 13.3395 29.1162 12.1503 26.8981C10.9612 24.6802 10.5769 22.1185 11.0641 19.6496C11.5513 17.1805 12.8793 14.9563 14.822 13.356C16.7006 11.8085 19.042 10.9388 21.4704 10.8784L20.2696 12.0792C19.9555 12.3933 19.8329 12.8519 19.9478 13.2808C20.0628 13.7096 20.398 14.0449 20.8269 14.1598C21.2558 14.2747 21.7137 14.1513 22.0277 13.8373L25.0985 10.7665C25.3315 10.5335 25.4624 10.2172 25.4624 9.88748C25.4624 9.55783 25.3316 9.24152 25.0985 9.00843L22.0277 5.93763C21.7137 5.62364 21.2551 5.50092 20.8262 5.61584C20.3977 5.73087 20.0628 6.06568 19.9478 6.4942C19.8328 6.92317 19.9556 7.38173 20.2696 7.69573L20.9947 8.42079C18.013 8.59152 15.1721 9.75531 12.9285 11.7333Z" fill="black" stroke="black" stroke-width="0.2"/>
+            </g>
+            <defs>
+              <clipPath id="clip0_reset">
+                <rect width="30.7591" height="30.7591" fill="white" transform="matrix(-0.707107 0.707107 0.707107 0.707107 21.75 0)"/>
+              </clipPath>
+            </defs>
+          </svg>
+        </button>
+        <button class="btn-pill btn-icon" id="btn-time" onclick="openDrawer()">
+          <svg width="34" height="34" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M28.241 9.28596C28.4641 9.4719 28.7298 9.56221 29.0007 9.56221C29.3407 9.56221 29.6754 9.41878 29.9091 9.13721C30.3288 8.63254 30.2597 7.88879 29.7604 7.46909L26.2062 4.50486C25.7016 4.08518 24.9578 4.15423 24.5381 4.6536C24.1184 5.15828 24.1875 5.90203 24.6869 6.32173L25.4944 6.9964L24.2194 8.39358C22.0837 6.77325 19.4327 5.80108 16.5535 5.80108C9.5305 5.80108 3.81396 11.517 3.81396 18.5352C3.81396 25.5531 9.52993 31.2747 16.5535 31.2747C23.5768 31.2747 29.293 25.5588 29.293 18.5352C29.293 15.2468 28.0286 12.2506 25.9726 9.98733L27.3167 8.50515L28.2411 9.27548L28.241 9.28596ZM16.5535 28.9105C10.8375 28.9105 6.18351 24.2564 6.18351 18.5405C6.18351 12.8245 10.8375 8.17048 16.5535 8.17048C22.2695 8.17048 26.9235 12.8245 26.9235 18.5405C26.9235 24.2564 22.2695 28.9105 16.5535 28.9105ZM13.0685 3.90461C13.0685 3.25119 13.5998 2.71994 14.2532 2.71994H18.8222C19.4756 2.71994 20.0069 3.25119 20.0069 3.90461C20.0069 4.55804 19.4756 5.08929 18.8222 5.08929H14.2532C13.5998 5.08929 13.0685 4.55804 13.0685 3.90461ZM16.6175 12.9092C14.0357 12.9092 11.8204 14.7527 11.358 17.2867C11.2518 17.8552 10.7577 18.2589 10.1946 18.2589C10.1255 18.2589 10.0512 18.2536 9.9821 18.2377C9.33928 18.1208 8.91428 17.5045 9.03118 16.8617C9.70056 13.2013 12.8933 10.5451 16.6228 10.5451C16.7981 10.5451 16.9734 10.5504 17.1434 10.561C17.7969 10.6035 18.2909 11.1667 18.2431 11.8201C18.2006 12.4735 17.664 12.9835 16.984 12.9198C16.8672 12.9092 16.745 12.9092 16.6228 12.9092L16.6175 12.9092ZM20.2884 13.8442L18.0731 15.9374C17.6268 15.6664 17.1115 15.507 16.5537 15.507C14.9228 15.507 13.5946 16.8352 13.5946 18.4662C13.5946 20.0972 14.9227 21.4253 16.5537 21.4253C18.1847 21.4253 19.5128 20.0972 19.5128 18.4662C19.5128 18.2696 19.4916 18.0783 19.4544 17.8871L21.9141 15.5602C22.3869 15.1086 22.4082 14.3596 21.9619 13.8868C21.5103 13.414 20.7613 13.3927 20.2885 13.839L20.2884 13.8442ZM16.5538 19.0612C16.2297 19.0612 15.9641 18.7956 15.9641 18.4716C15.9641 18.1475 16.2297 17.8819 16.5538 17.8819C16.8778 17.8819 17.1435 18.1475 17.1435 18.4716C17.1435 18.7956 16.8778 19.0612 16.5538 19.0612Z" fill="black"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- BOTTOM player zone -->
+    <div class="player-zone bottom state-idle-active" id="zone-bottom" onclick="handleZoneTap('bottom')">
+      <div class="flip-clock" id="clock-bottom"></div>
+      <div class="speaker-grill">
+        <div class="dot-grid" id="dots-bottom"></div>
+      </div>
+      <div class="gameover-label" id="gameover-bottom">
+        <div class="gameover-text">Time's Up!</div>
+      </div>
+    </div>
+
+  </div><!-- /game -->
+
+  <!-- TIME DRAWER OVERLAY -->
+  <div id="drawer-overlay" onclick="closeDrawer()"></div>
+  <div id="drawer">
+    <div class="drawer-handle"></div>
+    <div class="drawer-title">Choose a game time.</div>
+    <div class="time-grid" id="time-grid"></div>
+  </div>
+
+  <!-- RESET CONFIRM -->
+  <div id="confirm-overlay">
+    <div class="confirm-box">
+      <div class="confirm-title">Reset the game?</div>
+      <div class="confirm-sub">Current game progress will be lost.</div>
+      <div class="confirm-btns">
+        <button class="confirm-btn cancel" onclick="cancelReset()">Cancel</button>
+        <button class="confirm-btn confirm" onclick="confirmReset()">Reset</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+const PRESETS = [1, 2, 3, 5, 10, 15, 20, 30];
+const STATES = { IDLE: 'idle', TOP_ACTIVE: 'top', BOTTOM_ACTIVE: 'bottom', PAUSED: 'paused', GAMEOVER: 'gameover' };
+
+let state = {
+  screen: 'splash',
+  gameState: STATES.IDLE,
+  selectedMinutes: 3,
+  topCentis: 3 * 60 * 10,     // stored in tenths of a second
+  bottomCentis: 3 * 60 * 10,
+  prevActive: null,
+  interval: null,
+  lastTick: null,
+};
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  buildDots('dots-top');
+  buildDots('dots-bottom');
+  buildTimeGrid();
+  renderClocks();
+  updateZoneStates();
+
+  // Splash → game after 1.8s
+  setTimeout(() => {
+    showScreen('game');
+  }, 1800);
+});
+
+function buildDots(id) {
+  const el = document.getElementById(id);
+  for (let i = 0; i < 40; i++) {
+    const s = document.createElement('span');
+    el.appendChild(s);
+  }
+}
+
+function buildTimeGrid() {
+  const grid = document.getElementById('time-grid');
+  PRESETS.forEach(min => {
+    const btn = document.createElement('button');
+    btn.className = 'time-btn' + (min === state.selectedMinutes ? ' selected' : '');
+    btn.textContent = min + ' min';
+    btn.dataset.min = min;
+    btn.onclick = () => selectTime(min);
+    grid.appendChild(btn);
+  });
+}
+
+// ─── SCREEN ──────────────────────────────────────────────────────────────────
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(name).classList.add('active');
+  state.screen = name;
+}
+
+// ─── CLOCK RENDER ────────────────────────────────────────────────────────────
+function centisToDisplay(centis) {
+  const totalSecs = Math.floor(centis / 10);
+  const m = Math.floor(totalSecs / 60);
+  const s = totalSecs % 60;
+  const tenths = centis % 10;
+  return { m, s, tenths };
+}
+
+// Track previous displayed values for each clock
+const prevValues = {
+  'clock-top':    { mm: null, ss: null, tenths: null },
+  'clock-bottom': { mm: null, ss: null, tenths: null },
+};
+
+function renderFlipClock(containerId, totalCentis) {
+  const el = document.getElementById(containerId);
+  const { m, s, tenths } = centisToDisplay(totalCentis);
+  const mm = String(m).padStart(2, '0');
+  const ss = String(s).padStart(2, '0');
+  const t  = String(tenths);
+  const prev = prevValues[containerId];
+
+  // First render — build DOM from scratch
+  if (prev.mm === null) {
+    const sep = `<div class="flip-sep-wrap"><div class="flip-sep-dot"></div><div class="flip-sep-dot"></div></div>`;
+    el.innerHTML = `
+      ${makeTile('tile-mm', mm, false)}
+      ${sep}
+      ${makeTile('tile-ss', ss, false)}
+      ${sep}
+      ${makeTile('tile-t', t, true)}
+    `;
+    prev.mm = mm; prev.ss = ss; prev.tenths = t;
+    return;
+  }
+
+  // Animate only tiles that changed
+  if (mm !== prev.mm) { animateTile(el.querySelector('#tile-mm'), prev.mm, mm, false); prev.mm = mm; }
+  if (ss !== prev.ss) { animateTile(el.querySelector('#tile-ss'), prev.ss, ss, false); prev.ss = ss; }
+  if (t  !== prev.tenths) { animateTile(el.querySelector('#tile-t'),  prev.tenths, t,  true);  prev.tenths = t; }
+}
+
+function makeTile(id, value, small) {
+  const cls = small ? 'flip-tile small' : 'flip-tile';
+  const fs  = small
+    ? 'font-size:clamp(34px,13vw,61px)'
+    : 'font-size:clamp(52px,20vw,92px)';
+  const br  = small ? '18px' : '25px';
+  return `<div class="${cls}" id="${id}">
+    <div class="flip-static-top"><span class="flip-digit" style="${fs}">${value}</span></div>
+    <div class="flip-static-bottom"><span class="flip-digit" style="${fs}">${value}</span></div>
+    <div class="flip-flap-top"><span class="flip-digit" style="${fs}">${value}</span></div>
+    <div class="flip-flap-bottom"><span class="flip-digit" style="${fs}">${value}</span></div>
+  </div>`;
+}
+
+function animateTile(tile, oldVal, newVal, small) {
+  if (!tile) return;
+  const fs = small
+    ? 'font-size:clamp(34px,13vw,61px)'
+    : 'font-size:clamp(52px,20vw,92px)';
+
+  // Static top shows NEW value immediately (revealed as flap-top folds away)
+  tile.querySelector('.flip-static-top').innerHTML    = `<span class="flip-digit" style="${fs}">${newVal}</span>`;
+  // Static bottom keeps OLD value until flap-bottom animation finishes
+  tile.querySelector('.flip-static-bottom').innerHTML = `<span class="flip-digit" style="${fs}">${oldVal}</span>`;
+
+  // Flap top shows OLD value folding away
+  const flapTop = tile.querySelector('.flip-flap-top');
+  flapTop.innerHTML = `<span class="flip-digit" style="${fs}">${oldVal}</span>`;
+  flapTop.classList.remove('animating');
+  void flapTop.offsetWidth;
+  flapTop.classList.add('animating');
+
+  // Flap bottom shows NEW value swinging into place
+  const flapBot = tile.querySelector('.flip-flap-bottom');
+  flapBot.innerHTML = `<span class="flip-digit" style="${fs}">${newVal}</span>`;
+  flapBot.classList.remove('animating');
+  void flapBot.offsetWidth;
+  flapBot.classList.add('animating');
+
+  // Once flap-bottom animation ends, update static-bottom to new value
+  flapBot.addEventListener('animationend', () => {
+    tile.querySelector('.flip-static-bottom').innerHTML = `<span class="flip-digit" style="${fs}">${newVal}</span>`;
+  }, { once: true });
+}
+
+function renderClocks() {
+  renderFlipClock('clock-top', state.topCentis);
+  renderFlipClock('clock-bottom', state.bottomCentis);
+}
+
+// ─── ZONE STATES ─────────────────────────────────────────────────────────────
+function updateZoneStates() {
+  const topZone = document.getElementById('zone-top');
+  const bottomZone = document.getElementById('zone-bottom');
+  const btnLogo = document.getElementById('btn-logo');
+  const btnPause = document.getElementById('btn-pause');
+  const goTop = document.getElementById('gameover-top');
+  const goBottom = document.getElementById('gameover-bottom');
+
+  // Clear gameover labels
+  goTop.classList.remove('visible');
+  goBottom.classList.remove('visible');
+
+  // Clear state classes
+  const allStates = ['state-active','state-inactive','state-idle-active','state-idle-inactive','state-gameover-lost','state-gameover-won'];
+  topZone.classList.remove(...allStates);
+  bottomZone.classList.remove(...allStates);
+
+  switch (state.gameState) {
+    case STATES.IDLE:
+      topZone.classList.add('state-idle-inactive');
+      bottomZone.classList.add('state-idle-active');
+      btnLogo.style.display = '';
+      btnPause.style.display = 'none';
+      break;
+    case STATES.TOP_ACTIVE:
+      topZone.classList.add('state-active');
+      bottomZone.classList.add('state-inactive');
+      btnLogo.style.display = 'none';
+      btnPause.style.display = '';
+      setPauseIcon('pause');
+      break;
+    case STATES.BOTTOM_ACTIVE:
+      topZone.classList.add('state-inactive');
+      bottomZone.classList.add('state-active');
+      btnLogo.style.display = 'none';
+      btnPause.style.display = '';
+      setPauseIcon('pause');
+      break;
+    case STATES.PAUSED:
+      const wasTop = state.prevActive === STATES.TOP_ACTIVE;
+      topZone.classList.add(wasTop ? 'state-active' : 'state-inactive');
+      bottomZone.classList.add(wasTop ? 'state-inactive' : 'state-active');
+      btnLogo.style.display = 'none';
+      btnPause.style.display = '';
+      setPauseIcon('play');
+      break;
+    case STATES.GAMEOVER:
+      const topLost = state.topCentis === 0;
+      topZone.classList.add(topLost ? 'state-gameover-lost' : 'state-gameover-won');
+      bottomZone.classList.add(topLost ? 'state-gameover-won' : 'state-gameover-lost');
+      if (topLost) goTop.classList.add('visible');
+      else goBottom.classList.add('visible');
+      btnLogo.style.display = '';
+      btnPause.style.display = 'none';
+      break;
+  }
+}
+
+function setPauseIcon(type) {
+  const btn = document.getElementById('btn-pause');
+  if (type === 'pause') {
+    btn.innerHTML = `<svg width="20" height="24" viewBox="0 0 20 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="7" height="24" rx="3.5" fill="#FF6C02"/>
+      <rect x="13" width="7" height="24" rx="3.5" fill="#FF6C02"/>
+    </svg>`;
+  } else {
+    btn.innerHTML = `<svg width="20" height="24" viewBox="0 0 20 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M5.44953 0.608113L18.5505 9.37343C20.4832 10.6671 20.4832 13.3337 18.5505 14.6275L5.44953 23.392C3.16624 24.9201 0 23.392 0 20.7655V3.2346C0 0.607211 3.16508 -0.919837 5.44953 0.608113Z" fill="#FF6C02"/>
+    </svg>`;
+  }
+}
+
+// ─── TIMER ────────────────────────────────────────────────────────────────────
+function startTimer() {
+  clearInterval(state.interval);
+  state.lastTick = Date.now();
+  state.interval = setInterval(tick, 100);
+}
+
+function stopTimer() {
+  clearInterval(state.interval);
+  state.interval = null;
+}
+
+function tick() {
+  const now = Date.now();
+  const elapsed = now - state.lastTick;
+
+  if (elapsed >= 100) {
+    const ticks = Math.floor(elapsed / 100); // each tick = 1 tenth
+    state.lastTick = now - (elapsed % 100);
+
+    if (state.gameState === STATES.TOP_ACTIVE) {
+      state.topCentis = Math.max(0, state.topCentis - ticks);
+      renderClocks();
+      if (state.topCentis === 0) gameOver();
+    } else if (state.gameState === STATES.BOTTOM_ACTIVE) {
+      state.bottomCentis = Math.max(0, state.bottomCentis - ticks);
+      renderClocks();
+      if (state.bottomCentis === 0) gameOver();
+    }
+  }
+}
+
+function gameOver() {
+  stopTimer();
+  state.gameState = STATES.GAMEOVER;
+  updateZoneStates();
+  releaseWakeLock();
+}
+
+// ─── INTERACTIONS ─────────────────────────────────────────────────────────────
+function handleZoneTap(which) {
+  if (state.gameState === STATES.GAMEOVER) return;
+  if (state.gameState === STATES.PAUSED) return;
+
+  if (state.gameState === STATES.IDLE) {
+    // Start game: tapped side becomes active
+    state.gameState = which === 'top' ? STATES.TOP_ACTIVE : STATES.BOTTOM_ACTIVE;
+    startTimer();
+    requestWakeLock();
+    updateZoneStates();
+    return;
+  }
+
+  // Switch turns: only respond to taps on the ACTIVE side
+  if (state.gameState === STATES.TOP_ACTIVE && which === 'top') {
+    state.gameState = STATES.BOTTOM_ACTIVE;
+    updateZoneStates();
+  } else if (state.gameState === STATES.BOTTOM_ACTIVE && which === 'bottom') {
+    state.gameState = STATES.TOP_ACTIVE;
+    updateZoneStates();
+  }
+  // tapping inactive side → ignored
+}
+
+function handlePause() {
+  if (state.gameState === STATES.PAUSED) {
+    // Resume
+    state.gameState = state.prevActive;
+    state.prevActive = null;
+    startTimer();
+    requestWakeLock();
+    updateZoneStates();
+  } else if (state.gameState === STATES.TOP_ACTIVE || state.gameState === STATES.BOTTOM_ACTIVE) {
+    // Pause
+    state.prevActive = state.gameState;
+    state.gameState = STATES.PAUSED;
+    stopTimer();
+    releaseWakeLock();
+    updateZoneStates();
+  }
+}
+
+function handleReset() {
+  const inProgress = state.gameState !== STATES.IDLE && state.gameState !== STATES.GAMEOVER;
+  if (inProgress) {
+    document.getElementById('confirm-overlay').classList.add('open');
+  } else {
+    doReset();
+  }
+}
+
+function cancelReset() {
+  document.getElementById('confirm-overlay').classList.remove('open');
+}
+
+function confirmReset() {
+  document.getElementById('confirm-overlay').classList.remove('open');
+  doReset();
+}
+
+function doReset() {
+  stopTimer();
+  releaseWakeLock();
+  state.gameState = STATES.IDLE;
+  state.prevActive = null;
+  state.topCentis = state.selectedMinutes * 60 * 10;
+  state.bottomCentis = state.selectedMinutes * 60 * 10;
+  prevValues['clock-top']    = { mm: null, ss: null, tenths: null };
+  prevValues['clock-bottom'] = { mm: null, ss: null, tenths: null };
+  renderClocks();
+  updateZoneStates();
+}
+
+// ─── TIME SELECTION ───────────────────────────────────────────────────────────
+function openDrawer() {
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('drawer-overlay').classList.add('open');
+}
+
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('drawer-overlay').classList.remove('open');
+}
+
+function selectTime(min) {
+  state.selectedMinutes = min;
+  document.querySelectorAll('.time-btn').forEach(btn => {
+    btn.classList.toggle('selected', parseInt(btn.dataset.min) === min);
+  });
+  closeDrawer();
+  doReset();
+}
+
+// ─── WAKE LOCK ────────────────────────────────────────────────────────────────
+let wakeLock = null;
+async function requestWakeLock() {
+  if ('wakeLock' in navigator) {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+    } catch(e) { /* graceful fallback */ }
+  }
+}
+function releaseWakeLock() {
+  if (wakeLock) { wakeLock.release(); wakeLock = null; }
+}
+
+// ─── VISIBILITY / BACKGROUND AUTO-PAUSE ──────────────────────────────────────
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    if (state.gameState === STATES.TOP_ACTIVE || state.gameState === STATES.BOTTOM_ACTIVE) {
+      handlePause();
+    }
+  } else {
+    // Re-request wake lock if still active
+    if (state.gameState === STATES.TOP_ACTIVE || state.gameState === STATES.BOTTOM_ACTIVE) {
+      requestWakeLock();
+    }
+  }
+});
+
+// Re-acquire wake lock after page becomes visible
+document.addEventListener('visibilitychange', async () => {
+  if (!document.hidden && wakeLock !== null && wakeLock.released) {
+    await requestWakeLock();
+  }
+});
+</script>
+</body>
+</html>
